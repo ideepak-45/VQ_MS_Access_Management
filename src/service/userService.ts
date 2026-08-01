@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from "express";
-import crypto from "crypto";
 import { logger } from "../util/logger";
 import { Users } from "../model/users";
 import httpResponse from "../util/httpResponse";
@@ -70,15 +69,13 @@ export const createUser = async function (req: Request, res: Response, next: Nex
             return httpError(next, req, new Error("Invalid mobile number"), responseMessage.BAD_REQUEST);
         }
 
-        const hashedPassword = crypto.createHash("sha256").update(password).digest("hex");
-
         const userObject = new Users({
             username,
             email,
             firstName,
             lastName,
             mobile,
-            password: hashedPassword,
+            password,
         });
 
         await userObject.save();
