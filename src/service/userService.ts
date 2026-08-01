@@ -19,10 +19,10 @@ export const fetchUsers = async function (req: Request, res: Response, next: Nex
                 mobile: 1,
             }
         );
-        httpResponse(req, res, responseMessage.SUCCESS, usersData);
+        return httpResponse(req, res, responseMessage.SUCCESS, usersData);
     } catch (error) {
         logger.error(`Exception occurred in fetchUsers function`, error);
-        httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+        return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
     }
 };
 
@@ -37,10 +37,10 @@ export const fetchUsersByQuery = async function (req: Request, res: Response, ne
             lastName: 1,
             mobile: 1,
         }).sort(sortings);
-        httpResponse(req, res, responseMessage.SUCCESS, usersData);
+        return httpResponse(req, res, responseMessage.SUCCESS, usersData);
     } catch (error) {
         logger.error(`Exception occurred in fetchUsers function`, error);
-        httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+        return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
     }
 };
 
@@ -55,19 +55,19 @@ export const createUser = async function (req: Request, res: Response, next: Nex
         });
 
         if (userAlreadyExists) {
-            httpError(next, req, new Error("username or email already taken"), responseMessage.CONFLICT);
+            return httpError(next, req, new Error("username or email already taken"), responseMessage.CONFLICT);
         }
 
         if (password !== confirm_password) {
-            httpError(next, req, new Error("password does not match with confirm_password"), responseMessage.BAD_REQUEST);
+            return httpError(next, req, new Error("password does not match with confirm_password"), responseMessage.BAD_REQUEST);
         }
 
         if (password == null || password.length < 8) {
-            httpError(next, req, new Error("Password length must be greater than or equal to 8"), responseMessage.BAD_REQUEST);
+            return httpError(next, req, new Error("Password length must be greater than or equal to 8"), responseMessage.BAD_REQUEST);
         }
 
         if (mobile == null || mobile.length != 10) {
-            httpError(next, req, new Error("Invalid mobile number"), responseMessage.BAD_REQUEST);
+            return httpError(next, req, new Error("Invalid mobile number"), responseMessage.BAD_REQUEST);
         }
 
         const hashedPassword = crypto.createHash("sha256").update(password).digest("hex");
@@ -83,9 +83,9 @@ export const createUser = async function (req: Request, res: Response, next: Nex
 
         await userObject.save();
 
-        httpResponse(req, res, responseMessage.CREATED, null);
+        return httpResponse(req, res, responseMessage.CREATED, null);
     } catch (error) {
         logger.error(`Exception occurred in createUser function`, error);
-        httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+        return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
     }
 };

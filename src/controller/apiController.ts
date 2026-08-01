@@ -9,19 +9,19 @@ import mongoose from "mongoose";
 export default {
     self: (req: Request, res: Response, next: NextFunction) => {
         try {
-            httpResponse(req, res, responseMessage.SUCCESS, { info: "API is working fine." });
+            return httpResponse(req, res, responseMessage.SUCCESS, { info: "API is working fine." });
         } catch (error) {
             logger.error(`API CONTROLLER ERROR`, { meta: { endpoint: "/self" }, error });
-            httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+            return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
         }
     },
     health: async (req: Request, res: Response, next: NextFunction) => {
         try {
             const healthData = await quicker.getHealth(mongoose.connection);
-            httpResponse(req, res, responseMessage.SUCCESS, healthData);
+            return httpResponse(req, res, responseMessage.SUCCESS, healthData);
         } catch (error) {
             logger.error(`API CONTROLLER ERROR`, { meta: { endpoint: "/health" }, error });
-            httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+            return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
         }
     },
 };
