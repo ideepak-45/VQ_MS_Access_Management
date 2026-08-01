@@ -26,5 +26,18 @@ export default (req: Request, res: Response, responseMeta: TResponseMeta, data: 
         delete response.request.ip;
     }
 
+    // check for sending response more than once
+    if (res.headersSent) {
+        const message = `Attempted to send response twice. Response already sent for ${req.method} ${req.originalUrl}`;
+
+        logger.error(message);
+
+        if (config.NODE_ENV !== EApplicationEnvironment.PRODUCTION) {
+            throw new Error(message);
+        }
+
+        return;
+    }
+
     res.status(responseMeta.statusCode).json(response);
 };
