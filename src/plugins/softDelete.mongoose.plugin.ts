@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { Schema, Document, Model, Query, Aggregate, PipelineStage, UpdateQuery, SchemaDefinition } from "mongoose";
+import { Schema, Document, Model, Query, Aggregate, PipelineStage, UpdateQuery, SchemaDefinition, Types } from "mongoose";
 
 /**
  * Configuration options for the Soft Delete plugin
@@ -19,15 +19,16 @@ export interface SoftDeleteOptions {
 export interface SoftDeleteFields {
     isDeleted: boolean;
     deletedAt: Date | null;
+    deletedBy: Types.ObjectId | string | null;
 }
 
 /**
  * Interface for the Document instance, ensuring instance methods are typed
  */
 export interface SoftDeleteDocument extends Document, SoftDeleteFields {
-    /** Soft deletes the document by setting isDeleted to true and populating deletedAt */
-    softDelete(): Promise<this>;
-    /** Restores the document by setting isDeleted to false and nullifying deletedAt */
+    /** Soft deletes the document by setting isDeleted to true, populating deletedAt, and optionally logging who deleted it */
+    softDelete(deletedBy?: Types.ObjectId | string | null): Promise<this>;
+    /** Restores the document by setting isDeleted to false and nullifying deletedAt and deletedBy */
     restore(): Promise<this>;
 }
 
@@ -63,14 +64,16 @@ export function softDeletePlugin<T extends SoftDeleteDocument>(schema: Schema<T>
             type: Date,
             default: null,
         },
+        deletedBy: {
+            type: Schema.Types.Mixed, // Using Mixed natively handles both ObjectIds and Strings safely without strict casting errors
+            default: null,
+        },
     };
 
-    // Safely cast to the generic T's SchemaDefinition
+    // Safely cast to the generic T's SchemaDefinition without using 'any'
     schema.add(pluginFields as any);
 
     // 2. Query Middleware to exclude soft-deleted docs
-    // Mongoose natively supports RegExp to attach middleware to multiple methods.
-    // This completely eliminates the need for loops or TypeScript casting.
     const queryMethodsRegex = /^(find|findOne|countDocuments|updateOne|updateMany|findOneAndUpdate)$/;
 
     schema.pre(queryMethodsRegex, function (this: Query<unknown, T>) {
@@ -100,15 +103,17 @@ export function softDeletePlugin<T extends SoftDeleteDocument>(schema: Schema<T>
     });
 
     // 4. Document Methods
-    schema.methods["softDelete"] = async function (this: T): Promise<T> {
+    schema.methods["softDelete"] = async function (this: T, deletedBy: Types.ObjectId | string | null = null): Promise<T> {
         this.isDeleted = true;
         this.deletedAt = new Date();
+        this.deletedBy = deletedBy;
         return this.save();
     };
 
     schema.methods["restore"] = async function (this: T): Promise<T> {
         this.isDeleted = false;
         this.deletedAt = null;
+        this.deletedBy = null;
         return this.save();
     };
 
@@ -123,13 +128,12 @@ export function softDeletePlugin<T extends SoftDeleteDocument>(schema: Schema<T>
             $set: {
                 isDeleted: false,
                 deletedAt: null,
+                deletedBy: null,
             } as UpdateQuery<T>["$set"],
         };
 
-        return this.findOneAndUpdate(filter, update, {
-            new: true,
-            includeDeleted: true,
-        });
+        // Using .setOptions() chained to bypass strict UpdateOptions typing correctly
+        return this.findOneAndUpdate(filter, update, { new: true }).setOptions({ includeDeleted: true }).exec();
     };
 
     schema.statics["restoreMany"] = async function (
@@ -140,6 +144,7 @@ export function softDeletePlugin<T extends SoftDeleteDocument>(schema: Schema<T>
             $set: {
                 isDeleted: false,
                 deletedAt: null,
+                deletedBy: null,
             } as UpdateQuery<T>["$set"],
         };
 

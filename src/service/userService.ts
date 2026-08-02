@@ -5,6 +5,12 @@ import httpResponse from "../util/httpResponse";
 import httpError from "../util/httpError";
 import responseMessage from "../constant/responseMessage";
 
+interface AuthenticatedRequest extends Request {
+    user?: {
+        username?: string;
+    };
+}
+
 export const fetchUsers = async function (req: Request, res: Response, next: NextFunction) {
     try {
         logger.info(`Request recieved in fetchUsers function`);
@@ -99,7 +105,7 @@ export const deleteUser = async function (req: Request, res: Response, next: Nex
             return httpError(next, req, new Error("User does not exist or already deleted"), responseMessage.CONFLICT);
         }
 
-        const { isDeleted, deletedAt } = await user.softDelete();
+        const { isDeleted, deletedAt } = await user.softDelete((req as AuthenticatedRequest).user?.username || "admin");
 
         return httpResponse(req, res, responseMessage.SUCCESS, { isDeleted, deletedAt });
     } catch (error) {
