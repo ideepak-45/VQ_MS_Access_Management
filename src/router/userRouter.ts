@@ -22,4 +22,10 @@ router.route("/").all((req, res, next) => {
 // HTTP Method: POST | route for creating an user
 router.route("/").post(userController.createUser);
 
+// HTTP Method: DELETE | route for soft deleting an user by _id
+router.route("/").delete(userController.deleteUser);
+
+// HTTP Method: PATCH | route for restoring a soft deleted user
+router.route("/restore").patch(userController.restoreUser);
+
 export default router;

@@ -86,3 +86,45 @@ export const createUser = async function (req: Request, res: Response, next: Nex
         return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
     }
 };
+
+export const deleteUser = async function (req: Request, res: Response, next: NextFunction) {
+    try {
+        logger.info(`Request recieved in deleteUser function`, { meta: { "req.body": req.body } });
+
+        const { _id } = req.body;
+
+        const user = await Users.findById(_id);
+
+        if (!user) {
+            return httpError(next, req, new Error("User does not exist or already deleted"), responseMessage.CONFLICT);
+        }
+
+        const { isDeleted, deletedAt } = await user.softDelete();
+
+        return httpResponse(req, res, responseMessage.SUCCESS, { isDeleted, deletedAt });
+    } catch (error) {
+        logger.error(`Exception occurred in deleteUser function`, error);
+        return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+    }
+};
+
+export const restoreUser = async function (req: Request, res: Response, next: NextFunction) {
+    try {
+        logger.info(`Request recieved in restoreUser function`, { meta: { "req.body": req.body } });
+
+        const { email } = req.body;
+
+        const user = await Users.findOne({ email }).setOptions({ includeDeleted: true });
+
+        if (!user) {
+            return httpError(next, req, new Error("User does not exist for restoration"), responseMessage.CONFLICT);
+        }
+
+        const { _id, username } = await user.restore();
+
+        return httpResponse(req, res, responseMessage.SUCCESS, { _id, username });
+    } catch (error) {
+        logger.error(`Exception occurred in restoreUser function`, error);
+        return httpError(next, req, error, responseMessage.SOME_ERROR_OCCURRED);
+    }
+};
