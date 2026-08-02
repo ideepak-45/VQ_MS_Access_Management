@@ -1,7 +1,8 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import { softDeletePlugin, SoftDeleteDocument, SoftDeleteModel } from "../plugins/softDelete.mongoose.plugin";
 
-interface userInterface {
+interface userInterface extends SoftDeleteDocument {
     username: string;
     email: string;
     mobile: string;
@@ -49,6 +50,8 @@ userSchema.pre("save", async function () {
     this.password = await bcrypt.hash(this.password, 12);
 });
 
+userSchema.plugin(softDeletePlugin, { index: true });
+
 const myDB = mongoose.connection.useDb("authprofile");
 
-export const Users = myDB.model("users", userSchema, "users");
+export const Users = myDB.model<userInterface, SoftDeleteModel<userInterface>>("users", userSchema, "users");
