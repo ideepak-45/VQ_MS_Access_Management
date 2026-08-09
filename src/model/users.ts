@@ -16,6 +16,8 @@ interface userInterface extends SoftDeleteDocument {
 
 interface userDocumentInterface extends userInterface, mongoose.Document {}
 
+export type userDocument = mongoose.HydratedDocument<userDocumentInterface>;
+
 const userSchema: mongoose.Schema<userDocumentInterface> = new mongoose.Schema<userDocumentInterface>({
     username: {
         type: String,
