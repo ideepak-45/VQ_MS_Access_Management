@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+
+// Plugins
 import { softDeletePlugin, SoftDeleteDocument, SoftDeleteModel } from "../plugins/softDelete.mongoose.plugin";
+import { encryptionPlugin } from "../plugins/fieldEncryption.mongoose.plugin";
 
 interface userInterface extends SoftDeleteDocument {
     username: string;
@@ -23,11 +26,13 @@ const userSchema: mongoose.Schema<userDocumentInterface> = new mongoose.Schema<u
         type: String,
         required: true,
         unique: true,
+        isEncrypted: true,
     },
     mobile: {
         type: String,
         required: true,
         index: true,
+        isEncrypted: true,
     },
     firstName: {
         type: String,
@@ -51,6 +56,7 @@ userSchema.pre("save", async function () {
 });
 
 userSchema.plugin(softDeletePlugin, { index: true });
+userSchema.plugin(encryptionPlugin);
 
 const myDB = mongoose.connection.useDb("authprofile");
 
