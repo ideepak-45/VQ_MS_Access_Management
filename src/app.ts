@@ -1,7 +1,12 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import path from "path";
+import session from "express-session";
+import MongoStore from "connect-mongo";
+import cookieParser from "cookie-parser";
+import passport from "./config/passport";
 import router from "./router/apiRouter";
 import userRouter from "./router/userRouter";
+import authRouter from "./router/authRouter";
 import globalErrorHandler from "./middleware/globalErrorHandler";
 import httpError from "./util/httpError";
 import httpResponse from "./util/httpResponse";
@@ -10,6 +15,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { config } from "./config/config";
 import { traceStorage } from "./util/logger";
+import { authenticateUser } from "./middleware/authenticateUser";
 
 const app: Application = express();
 
@@ -24,6 +30,32 @@ app.use(
 );
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../", "public")));
+app.use(cookieParser());
+
+// Configure session
+app.use(
+    session({
+        secret: config.AUTH_SECRET_KEY as string,
+        resave: false,
+        saveUninitialized: false,
+
+        store: MongoStore.create({
+            mongoUrl: config.MONGODB_URI,
+            collectionName: "sessions",
+        }),
+
+        cookie: {
+            secure: process.env.NODE_ENV === "production", // true for HTTPS
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24, // 1 day
+            sameSite: "lax",
+        },
+    })
+);
+
+// Initialize Passport and restore authentication state from session
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Inject traceId in logs
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -40,7 +72,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Routes
 app.use("/api", router);
-app.use("/user", userRouter);
+app.use("/user", authenticateUser, userRouter);
+app.use("/auth", authRouter);
 
 // Ignore specific paths from logging and error handling
 const ignoredPaths = ["/favicon.ico", "/robots.txt", "/.well-known/appspecific/com.chrome.devtools.json"];

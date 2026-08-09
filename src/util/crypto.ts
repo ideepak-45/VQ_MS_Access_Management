@@ -44,6 +44,10 @@ export function bcryptHash(text: string): Promise<string> {
     return bcrypt.hash(text, 12);
 }
 
+export function bcryptCompare(text: string, hashedText: string): Promise<boolean> {
+    return bcrypt.compare(text, hashedText);
+}
+
 export function searchableHash(text: string): string {
     return crypto
         .createHmac("sha256", SEARCH_KEY as string)

@@ -10,4 +10,5 @@ export const config = {
     CORS_ORIGIN: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["http://localhost:3000"],
     DATA_ENC_KEY: process.env.DATA_ENC_KEY,
     SEARCH_KEY: process.env.SEARCH_KEY,
+    AUTH_SECRET_KEY: process.env.AUTH_SECRET_KEY,
 };
