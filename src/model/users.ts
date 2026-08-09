@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
 
 // Plugins
 import { softDeletePlugin, SoftDeleteDocument, SoftDeleteModel } from "../plugins/softDelete.mongoose.plugin";
 import { encryptionPlugin } from "../plugins/fieldEncryption.mongoose.plugin";
+import { customHashPlugin } from "../plugins/fieldHash.mongoose.plugin";
 
 interface userInterface extends SoftDeleteDocument {
     username: string;
@@ -21,12 +21,15 @@ const userSchema: mongoose.Schema<userDocumentInterface> = new mongoose.Schema<u
         type: String,
         required: true,
         unique: true,
+        isEncrypted: true,
+        searchableHash: true,
     },
     email: {
         type: String,
         required: true,
         unique: true,
         isEncrypted: true,
+        searchableHash: true,
     },
     mobile: {
         type: String,
@@ -37,25 +40,21 @@ const userSchema: mongoose.Schema<userDocumentInterface> = new mongoose.Schema<u
     firstName: {
         type: String,
         required: true,
+        isEncrypted: true,
     },
     lastName: {
         type: String,
+        isEncrypted: true,
     },
     password: {
         type: String,
         required: true,
+        passwordHash: true,
     },
 });
 
-userSchema.pre("save", async function () {
-    if (!this.isModified("password")) {
-        return;
-    }
-
-    this.password = await bcrypt.hash(this.password, 12);
-});
-
 userSchema.plugin(softDeletePlugin, { index: true });
+userSchema.plugin(customHashPlugin);
 userSchema.plugin(encryptionPlugin);
 
 const myDB = mongoose.connection.useDb("authprofile");

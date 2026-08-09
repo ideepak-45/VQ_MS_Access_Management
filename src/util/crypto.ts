@@ -1,8 +1,10 @@
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 import { config } from "../config/config";
 
 const algorithm = "aes-256-gcm";
 const DATA_ENC_KEY = config.DATA_ENC_KEY;
+const SEARCH_KEY = config.SEARCH_KEY;
 
 const secretKey = crypto
     .createHash("sha256")
@@ -36,4 +38,15 @@ export function decrypt(encryptedText: string): string {
     const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
     return decrypted.toString("utf8");
+}
+
+export function bcryptHash(text: string): Promise<string> {
+    return bcrypt.hash(text, 12);
+}
+
+export function searchableHash(text: string): string {
+    return crypto
+        .createHmac("sha256", SEARCH_KEY as string)
+        .update(text, "utf-8")
+        .digest("hex");
 }
