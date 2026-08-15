@@ -41,13 +41,17 @@ app.use(
 
         store: MongoStore.create({
             mongoUrl: config.MONGODB_URI,
+            dbName: "authprofile",
             collectionName: "sessions",
+            touchAfter: 180, // 3 minutes
         }),
+
+        rolling: true,
 
         cookie: {
             secure: process.env.NODE_ENV === "production", // true for HTTPS
             httpOnly: true,
-            maxAge: 1000 * 60 * 60 * 24, // 1 day
+            maxAge: 1000 * 60 * 15, // 15 minutes
             sameSite: "lax",
         },
     })
