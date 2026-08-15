@@ -61,4 +61,4 @@ userSchema.plugin(encryptionPlugin);
 
 const myDB = mongoose.connection.useDb("authprofile");
 
-export const Users = myDB.model<userInterface, SoftDeleteModel<userInterface>>("users", userSchema, "users");
+export const Users = myDB.model<userInterface, SoftDeleteModel<userInterface>>("User", userSchema, "users");

@@ -4,6 +4,7 @@ import { Users } from "../model/users";
 import httpResponse from "../util/httpResponse";
 import httpError from "../util/httpError";
 import responseMessage from "../constant/responseMessage";
+import { searchableHash } from "../util/crypto";
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -35,6 +36,22 @@ export const fetchUsersByQuery = async function (req: Request, res: Response, ne
     try {
         logger.info(`Request recieved in fetchUsersByQuery function`, { meta: { "req.body": req.body } });
         const { filters, sortings } = req.body;
+
+        const userSchema = Users.schema;
+
+        const searchableHashFields = Object.keys(userSchema.paths).filter((path) => userSchema.path(path)?.options?.searchableHash === true);
+
+        logger.info(`Searchable Hashed Fields of userSchema`, { meta: { searchableHashFields } });
+
+        for (const filter in filters) {
+            if (searchableHashFields.includes(filter)) {
+                filters[filter + "Hash"] = searchableHash(filters[filter]);
+                delete filters[filter];
+            }
+        }
+
+        logger.info(`Filters after searchable hashing`, { meta: { filters } });
+
         const usersData = await Users.find(filters, {
             username: 1,
             email: 1,
@@ -42,6 +59,7 @@ export const fetchUsersByQuery = async function (req: Request, res: Response, ne
             lastName: 1,
             mobile: 1,
         }).sort(sortings);
+
         return httpResponse(req, res, responseMessage.SUCCESS, usersData);
     } catch (error) {
         logger.error(`Exception occurred in fetchUsers function`, error);
@@ -120,7 +138,9 @@ export const restoreUser = async function (req: Request, res: Response, next: Ne
 
         const { email } = req.body;
 
-        const user = await Users.findOne({ email }).setOptions({ includeDeleted: true });
+        const emailHash = searchableHash(email);
+
+        const user = await Users.findOne({ emailHash }).setOptions({ includeDeleted: true });
 
         if (!user) {
             return httpError(next, req, new Error("User does not exist for restoration"), responseMessage.CONFLICT);
