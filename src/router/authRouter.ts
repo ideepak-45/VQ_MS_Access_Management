@@ -10,7 +10,7 @@ router.use(rateLimitMiddleware);
 // HTTP Method: POST | route for login
 router.route("/login").post(authController.login);
 
-// HTTP Method: GET | route for logout
-router.route("/logout").get(authController.logout);
+// HTTP Method: POST | route for logout
+router.route("/logout").post(authController.logout);
 
 export default router;

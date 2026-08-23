@@ -3,6 +3,7 @@ import path from "path";
 import session from "express-session";
 import MongoStore from "connect-mongo";
 import cookieParser from "cookie-parser";
+import parse from "parse-duration";
 import passport from "./config/passport";
 import router from "./router/apiRouter";
 import userRouter from "./router/userRouter";
@@ -15,7 +16,8 @@ import helmet from "helmet";
 import cors from "cors";
 import { config } from "./config/config";
 import { traceStorage } from "./util/logger";
-import { authenticateUser } from "./middleware/authenticateUser";
+import { authenticateSessionAndAccessToken } from "./middleware/authenticateUser";
+import { EApplicationEnvironment } from "./constant/application";
 
 const app: Application = express();
 
@@ -49,10 +51,10 @@ app.use(
         rolling: true,
 
         cookie: {
-            secure: process.env.NODE_ENV === "production", // true for HTTPS
+            secure: process.env.NODE_ENV === EApplicationEnvironment.PRODUCTION, // true for HTTPS
             httpOnly: true,
-            maxAge: 1000 * 60 * 15, // 15 minutes
-            sameSite: "lax",
+            maxAge: parse(config.SESSION_EXPIRATION as string) ?? eval("15*60*1000"), // 15 minutes default
+            sameSite: process.env.NODE_ENV === EApplicationEnvironment.PRODUCTION ? "none" : "lax",
         },
     })
 );
@@ -76,7 +78,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Routes
 app.use("/api", router);
-app.use("/user", authenticateUser, userRouter);
+app.use("/user", authenticateSessionAndAccessToken, userRouter);
 app.use("/auth", authRouter);
 
 // Ignore specific paths from logging and error handling

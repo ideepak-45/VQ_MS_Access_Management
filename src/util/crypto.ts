@@ -54,3 +54,7 @@ export function searchableHash(text: string): string {
         .update(text, "utf-8")
         .digest("hex");
 }
+
+export function generateUniqueId(): string {
+    return crypto.randomUUID();
+}
