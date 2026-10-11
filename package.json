@@ -66,6 +66,7 @@
         "passport": "^0.7.0",
         "passport-local": "^1.0.0",
         "rate-limiter-flexible": "^11.2.0",
+        "redis": "^6.3.0",
         "source-map-support": "^0.5.21",
         "ts-migrate-mongoose": "^5.3.3",
         "winston": "^3.19.0",

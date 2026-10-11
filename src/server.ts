@@ -2,6 +2,7 @@ import app from "./app";
 import { config } from "./config/config";
 import { logger } from "./util/logger";
 import mongooseService from "./service/database/mongooseService";
+import redisService from "./service/redis/redisService";
 import { initRateLimiter } from "./config/rateLimiter";
 
 const server = app.listen(config.PORT);
@@ -11,6 +12,15 @@ const server = app.listen(config.PORT);
         const mongooseConnection = await mongooseService.connect();
         logger.info(`Connected to MongoDB`, {
             meta: { host: mongooseConnection.host, port: mongooseConnection.port, name: mongooseConnection.name },
+        });
+
+        await redisService.connect();
+
+        logger.info("Connected to Redis", {
+            meta: {
+                host: config.REDIS_URI ? new URL(config.REDIS_URI).hostname : "localhost",
+                port: config.REDIS_URI ? new URL(config.REDIS_URI).port || "6379" : "6379",
+            },
         });
 
         await initRateLimiter(mongooseConnection);
