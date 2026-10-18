@@ -9,6 +9,7 @@ router.use(rateLimitMiddleware);
 
 // HTTP Method: POST | route for login
 router.route("/login").post(authController.login);
+router.route("/verify-otp").post(authController.verifyLoginOtp);
 
 // HTTP Method: POST | route for logout
 router.route("/logout").post(authController.logout);

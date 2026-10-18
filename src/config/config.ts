@@ -18,4 +18,9 @@ export const config = {
     REFRESH_TOKEN_EXPIRATION: process.env.REFRESH_TOKEN_EXPIRATION,
     ACCESS_TOKEN_EXPIRATION: process.env.ACCESS_TOKEN_EXPIRATION,
     MAX_DEVICE_SESSIONS: process.env.MAX_DEVICE_SESSIONS,
+    NOTIFICATION_SERVICE_HOST: process.env.NOTIFICATION_SERVICE_HOST || "localhost",
+    NOTIFICATION_SERVICE_PORT: Number(process.env.NOTIFICATION_SERVICE_PORT || 4000),
+    NOTIFICATION_SERVICE_SSL: process.env.NOTIFICATION_SERVICE_SSL === "true",
+    NOTIFICATION_SERVICE_PATH: process.env.NOTIFICATION_SERVICE_PATH || "/api/notifications/publish",
+    SUPPORT_EMAIL: process.env.SUPPORT_EMAIL || "rs.deepak.support@gmail.com",
 };

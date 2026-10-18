@@ -11,6 +11,11 @@ import { createAccessToken, createRefreshToken, getClientIp, getUserAgent } from
 import { generateUniqueId } from "../util/crypto";
 import { EApplicationEnvironment } from "../constant/application";
 import { refreshTokens } from "../model/refreshTokens";
+import { randomInt, createHash, randomUUID, timingSafeEqual } from "crypto";
+import { config } from "../config/config";
+import redisService from "./redis/redisService";
+import { requestMicroservice } from "./microserviceConnector";
+import { Users } from "../model/users";
 
 // Extend the Express session type to include custom fields for user authentication
 declare module "express-session" {
@@ -22,44 +27,9 @@ declare module "express-session" {
     }
 }
 
-export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const completeLogin = async (req: Request, res: Response, next: NextFunction, user: userDocument): Promise<void> => {
     try {
-        logger.info("Request received in login function", {
-            meta: {
-                "req.body": req.body,
-            },
-        });
-
-        // --------------------------------------------------
-        // 1. Authenticate user with Passport
-        // --------------------------------------------------
-
-        const user = await new Promise<userDocument>((resolve, reject) => {
-            passport.authenticate("local", (err: Error | null, authenticatedUser: userDocument | false, info: { message: string } | undefined) => {
-                if (err) {
-                    logger.error("Error occurred during user authentication", {
-                        meta: {
-                            err,
-                        },
-                    });
-
-                    return reject(err);
-                }
-
-                if (!authenticatedUser) {
-                    logger.warn("User authentication failed", {
-                        meta: {
-                            info,
-                        },
-                    });
-
-                    return reject(new Error(`Authentication failed: ${info?.message ?? "Invalid credentials"}`));
-                }
-
-                resolve(authenticatedUser);
-            })(req, res, next);
-        });
-
+        logger.info("Completing verified login", { meta: { userId: user._id.toString() } });
         // --------------------------------------------------
         // 2. Start a Mongoose session for transaction management
         // --------------------------------------------------
@@ -325,6 +295,98 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
             },
         });
 
+        return httpError(next, req, error as Error, responseMessage.SOME_ERROR_OCCURRED);
+    }
+};
+
+const OTP_TTL_SECONDS = 5 * 60;
+const otpDigest = (challengeId: string, otp: string): Buffer => createHash("sha256").update(`${challengeId}:${otp}`).digest();
+
+export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const user = await new Promise<userDocument>((resolve, reject) => {
+            passport.authenticate("local", (err: Error | null, authenticatedUser: userDocument | false, info: { message: string } | undefined) => {
+                if (err) return reject(err);
+                if (!authenticatedUser) return reject(new Error(`Authentication failed: ${info?.message ?? "Invalid credentials"}`));
+                resolve(authenticatedUser);
+            })(req, res, next);
+        });
+
+        const redis = redisService.getClient();
+        if (!redis?.isOpen) throw new Error("Redis is unavailable for login verification");
+
+        const userData = user.toObject();
+        const challengeId = randomUUID();
+        const otp = randomInt(0, 1_000_000).toString().padStart(6, "0");
+        const cacheKey = `auth:login-otp:${challengeId}`;
+        const digest = otpDigest(challengeId, otp).toString("hex");
+        await redis.set(cacheKey, JSON.stringify({ userId: user._id.toString(), digest, attempts: 0 }), { EX: OTP_TTL_SECONDS });
+
+        try {
+            await requestMicroservice(
+                {
+                    host: config.NOTIFICATION_SERVICE_HOST,
+                    port: config.NOTIFICATION_SERVICE_PORT,
+                    ssl: config.NOTIFICATION_SERVICE_SSL,
+                    path: config.NOTIFICATION_SERVICE_PATH,
+                },
+                {
+                    method: "POST",
+                    body: {
+                        channel: "email",
+                        templateId: "login_otp",
+                        recipient: { email: userData.email, name: userData.firstName },
+                        data: { otp, userName: userData.firstName, supportEmail: config.SUPPORT_EMAIL },
+                        correlationId: challengeId,
+                        metadata: { source: "auth-service" },
+                    },
+                }
+            );
+        } catch (error) {
+            await redis.del(cacheKey);
+            throw error;
+        }
+
+        return httpResponse(req, res, responseMessage.ACCEPTED, {
+            message: "A verification code has been sent to your email.",
+            challengeId,
+            expiresIn: OTP_TTL_SECONDS,
+        });
+    } catch (error) {
+        logger.error("Exception occurred while starting login", { meta: { error } });
+        return httpError(next, req, error as Error, responseMessage.SOME_ERROR_OCCURRED);
+    }
+};
+
+export const verifyLoginOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const { challengeId, otp } = req.body as { challengeId?: unknown; otp?: unknown };
+        if (typeof challengeId !== "string" || !/^[\da-f-]{36}$/i.test(challengeId) || typeof otp !== "string" || !/^\d{6}$/.test(otp)) {
+            return httpError(next, req, new Error("A valid challengeId and six digit OTP are required"), responseMessage.BAD_REQUEST);
+        }
+        const redis = redisService.getClient();
+        if (!redis?.isOpen) throw new Error("Redis is unavailable for login verification");
+        const key = `auth:login-otp:${challengeId}`;
+        const cachedValue = await redis.get(key);
+        if (!cachedValue) return httpError(next, req, new Error("OTP is invalid or expired"), responseMessage.UNAUTHORIZED);
+        const record = JSON.parse(cachedValue) as { userId: string; digest: string; attempts: number };
+        if (record.attempts >= 5) {
+            await redis.del(key);
+            return httpError(next, req, new Error("OTP is invalid or expired"), responseMessage.UNAUTHORIZED);
+        }
+        const expected = Buffer.from(record.digest, "hex");
+        const provided = otpDigest(challengeId, otp);
+        if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
+            record.attempts += 1;
+            await redis.set(key, JSON.stringify(record), { KEEPTTL: true });
+            return httpError(next, req, new Error("OTP is invalid or expired"), responseMessage.UNAUTHORIZED);
+        }
+        await redis.del(key);
+        const user = await Users.findById(record.userId);
+        if (!user) return httpError(next, req, new Error("User no longer exists"), responseMessage.UNAUTHORIZED);
+        return completeLogin(req, res, next, user);
+    } catch (error) {
+        logger.error("Exception occurred while verifying login OTP", { meta: { error } });
         return httpError(next, req, error as Error, responseMessage.SOME_ERROR_OCCURRED);
     }
 };
